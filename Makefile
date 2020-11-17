@@ -1,7 +1,9 @@
 #NS = your docker namespace
-export VERSION ?= 0.1
 
-export REPO = docker-registry-dev.internal.upstreamsystems.com:5000
+# For public repo
+export REPO = docker.pkg.github.com/nfvri/dpdk-telemetry-exporter
+
+export VERSION ?= 0.1
 
 export NAME = dpdk-telemetry-exporter
 
@@ -13,6 +15,8 @@ build-dpdk-telemetry-exporter:
 	docker build -t $(REPO)/$(NAME):$(VERSION) .
 
 push-dpdk-telemetry-exporter:
+	# For public repo
+	echo $(REPO_PAT) | base64 -d | docker login docker.pkg.github.com -u $(USERNAME) --password-stdin
 	docker push $(REPO)/$(NAME):$(VERSION)
 
 clean-dpdk-telemetry-exporter: 
