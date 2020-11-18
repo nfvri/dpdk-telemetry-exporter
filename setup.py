@@ -20,7 +20,7 @@ setup(name='dpdkTelemetryExporter',
         'pathos',
         'schedule'
       ],
-    entry_points={'console_scripts': ['dpdkTelemetryExporter=dpdkTelemetryExporter.main:main']},
+    entry_points={'console_scripts': ['dpdkTelemetryExporter=dpdkTelemetryExporter.dpdkTelemetryExporter:main']},
     zip_safe=False,
     data_files=yapsy_files + assets_files
 )

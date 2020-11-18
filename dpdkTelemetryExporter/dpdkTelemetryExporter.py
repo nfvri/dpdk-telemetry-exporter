@@ -24,7 +24,7 @@ V1_METRICS_REQ = "{\"action\":0,\"command\":\"ports_all_stat_values\",\"data\":n
 V1_API_REG = "{\"action\":1,\"command\":\"clients\",\"data\":{\"client_path\":\""
 V1_API_UNREG = "{\"action\":2,\"command\":\"clients\",\"data\":{\"client_path\":\""
 V1_GLOBAL_METRICS_REQ = "{\"action\":0,\"command\":\"global_stat_values\",\"data\":null}"
-V1_DEFAULT_FP = "{0}/default_client".format(os.environ.get('DPDK_RUN_DIR', '/var/run'))
+V1_DEFAULT_FP = "{0}/default_client".format(os.environ.get('DPDK_RUN_DIR', '/var/run/dpdk/'))
 
 class V1Socket:
 
@@ -142,6 +142,7 @@ class DPDKTelemetryExporter():
     def __init__(self, args):
         self.args = args
         self.threads = args.threads
+        self.timeout = args.timeout
         
         self.verbose = args.verbose
         if self.verbose >= 3:
@@ -240,7 +241,7 @@ class DPDKTelemetryExporter():
         # Start up the server to expose the metrics.
         start_http_server(8000)
         
-        schedule.every(int(self.timeout) + 10).seconds.do(self.getDPDKStats)
+        schedule.every(int(self.timeout)).seconds.do(self.getDPDKStats)
         while True:
             schedule.run_pending()
             time.sleep(1)
@@ -251,11 +252,20 @@ class DPDKTelemetryExporter():
 def parser():
     parser = argparse.ArgumentParser(prog='DPDKTelemetryExporter')
     parser.add_argument('-t', dest="threads", default='8', help='DPDKTelemetryExporter parallel threads (default: 8)')
+    parser.add_argument('-T', '--timeout', action='store', default=20, help='The update interval in seconds (default 20)')
+    parser.add_argument(
+        '-v',
+        '--verbose',
+        action='count',
+        default=2,
+        help='Set output verbosity (default: -vv = INFO)')
     return parser.parse_args()
 
+def main():
+    args = parser()
+    dte = DPDKTelemetryExporter(args)
+    dte.run()
 
 if __name__ == '__main__':
-    args = parser()
-    bb = DPDKTelemetryExporter(args)
-    bb.run()
+    main()
 
