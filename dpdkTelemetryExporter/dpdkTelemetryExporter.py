@@ -7,7 +7,7 @@ import schedule
 import json
 import logging
 import argparse
-from prometheus_client import start_http_server, Summary, Counter
+from prometheus_client import start_http_server, Summary, Counter, Gauge, Histogram
 import pathos.pools as pp
 import socket
 import os
@@ -80,17 +80,27 @@ class V1Client:
     def requestMetrics(self): # Requests metrics for given client
         self.socket.client_fd.send(V1_METRICS_REQ.encode())
         data = self.socket.client_fd.recv(BUFFER_SIZE).decode()
-        print("\nResponse: \n", data)
+        _log.debug("Response: {0}".format(data))
+        return data
 
     def requestGlobalMetrics(self): #Requests global metrics for given client
         self.socket.client_fd.send(V1_GLOBAL_METRICS_REQ.encode())
         data = self.socket.client_fd.recv(BUFFER_SIZE).decode()
-        print("\nResponse: \n", data)
+        _log.debug("Response: {0}".format(data))
+        return data
         
     def handle_socket(self):
         """ Connect to socket and handle user input """
-        self.requestGlobalMetrics()
-        self.requestMetrics()
+        globalMetrics = json.loads(self.requestGlobalMetrics())
+        
+        if '200' in globalMetrics['status_code']:
+            for port in globalMetrics['data']:
+                for metric in port['stats']:
+                    if metric['name'] == 'empty_poll':
+                        pass
+                        
+        
+        metrics = json.loads(self.requestMetrics())
             
 class V2Client:
 
@@ -154,9 +164,22 @@ class DPDKTelemetryExporter():
         else:
             _log.setLevel(logging.CRITICAL)
             
-        # # Set metrics to expose
-        self.bbexporter_request_latency_seconds = Summary('bbexporter_request_latency_seconds', '', ['tenant', 'campaign', 'endpoint', 'type'])
-        self.bbexporter_status_count = Counter('bbexporter_status_count', '', ['tenant', 'campaign', 'endpoint', 'status'])
+        ## Set metrics to expose
+        
+        # Gauges
+        self.dpdkexporter_busy_percent = Gauge('dpdk_telemetry_busy_percent', '', ['port', 'global', 'status'])
+        self.dpdkexporter_idle_status = Gauge('dpdk_telemetry_idle_status', '', ['port', 'global', 'status'])
+        
+        # Counter
+        self.dpdkexporter_polls = Counter('dpdk_telemetry_exporter_polls_total', '', ['type', 'port', 'global', 'status'])
+        self.dpdkexporter_packets = Counter('dpdk_telemetry_packets_total', '', ['type', 'direction', 'priority', 'port', 'global', 'status'])
+        self.dpdkexporter_bytes = Counter('dpdk_telemetry_bytes_total', '', ['type', 'direction', 'port', 'global', 'status'])
+        self.dpdkexporter_errors = Counter('dpdk_telemetry_errors_total', '', ['type', 'direction', 'port', 'global', 'status'])
+        self.dpdkexporter_idle_count = Counter('dpdk_telemetry_idle_total', '', ['port', 'global', 'status'])
+        
+        # Histogram
+        self.dpdkexporter_packets_size = Histogram('dpdk_telemetry_packets_size', '', ['direction', 'port', 'global', 'status'],
+                                                   buckets=(64, 128, 256, 512, 1024, 1522, float("inf")))
         
         self.p = pp.ProcessPool(int(self.threads))
     
