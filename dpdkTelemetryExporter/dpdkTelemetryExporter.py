@@ -184,7 +184,7 @@ class DPDKTelemetryExporter():
         for f in glob.glob('{0}/*/dpdk_telemetry.v2'.format(os.environ.get('DPDK_RUN_DIR', '/tmp'))):
             v2sockets.append(f)
         
-        _log.debug("v1sockets: {0}".format(v2sockets))
+        _log.debug("v2sockets: {0}".format(v2sockets))
         
         return v2sockets
         
