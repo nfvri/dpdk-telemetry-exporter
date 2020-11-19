@@ -162,7 +162,8 @@ class DPDKTelemetryExporter():
     def __init__(self, args):
         self.args = args
         self.threads = args.threads
-        self.timeout = args.timeout
+        self.timeout = int(args.timeout)
+        self.port = int(args.port)
         
         self.verbose = args.verbose
         if self.verbose >= 3:
@@ -358,9 +359,9 @@ class DPDKTelemetryExporter():
         
     def run(self):
         # Start up the server to expose the metrics.
-        start_http_server(8000)
+        start_http_server(self.port)
         
-        schedule.every(int(self.timeout)).seconds.do(self.getDPDKStats)
+        schedule.every(self.timeout).seconds.do(self.getDPDKStats)
         while True:
             schedule.run_pending()
             time.sleep(1)
@@ -370,7 +371,8 @@ class DPDKTelemetryExporter():
 
 def parser():
     parser = argparse.ArgumentParser(prog='DPDKTelemetryExporter')
-    parser.add_argument('-t', dest="threads", default='8', help='DPDKTelemetryExporter parallel threads (default: 8)')
+    parser.add_argument('-t', '--threads', dest="threads", default='8', help='DPDKTelemetryExporter parallel threads (default: 8)')
+    parser.add_argument('-p', '--port', dest="port", default=8000, help='DPDKTelemetryExporter port (default: 8000)')
     parser.add_argument('-T', '--timeout', action='store', default=5, help='The update interval in seconds (default 5)')
     parser.add_argument(
         '-v',
