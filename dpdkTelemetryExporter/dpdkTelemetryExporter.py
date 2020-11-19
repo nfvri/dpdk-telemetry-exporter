@@ -183,13 +183,14 @@ class DPDKTelemetryExporter():
         # Counter
         self.dpdkexporter_polls = Counter('dpdk_telemetry_exporter_polls_total', '', ['type', 'port', 'aggregate'])
         self.dpdkexporter_packets = Counter('dpdk_telemetry_packets_total', '', ['type', 'direction', 'priority', 'port', 'aggregate'])
-        self.dpdkexporter_bytes = Counter('dpdk_telemetry_bytes_total', '', ['type', 'direction', 'port', 'aggregate'])
+        self.dpdkexporter_bytes = Counter('dpdk_telemetry_bytes_total', '', ['type', 'direction', 'port', 'aggregate'], unit='bytes')
         self.dpdkexporter_errors = Counter('dpdk_telemetry_errors_total', '', ['type', 'direction', 'port', 'aggregate'])
         self.dpdkexporter_idle_count = Counter('dpdk_telemetry_idle_total', '', ['type', 'direction', 'port', 'aggregate'])
         
         # Histogram
+        self.buckets = (64, 128, 256, 512, 1024, 1522, float("inf"))
         self.dpdkexporter_packets_size = Histogram('dpdk_telemetry_packets_size', '', ['direction', 'port', 'aggregate'],
-                                                   buckets=(64, 128, 256, 512, 1024, 1522, float("inf")))
+                                                   buckets=self.buckets)
         
         self.p = pp.ProcessPool(int(self.threads))
     
@@ -252,6 +253,14 @@ class DPDKTelemetryExporter():
                 globalMetric = 1
             
             if 'stats' in result:
+                # Manually reset histogram
+                for direction in ['rx', 'tx']:
+                    self.dpdkexporter_packets_size.labels(port=port, aggregate=globalMetric, direction=direction
+                                                    )._sum.set(0)
+                    for i, bucket in enumerate(self.buckets):
+                        self.dpdkexporter_packets_size.labels(port=port, aggregate=globalMetric, direction=direction
+                                                    )._buckets[i].set(0)
+            
                 for metric in result['stats']:
                     if 'poll' in metric['name']:
                         self.dpdkexporter_polls.labels(type=metric['name'].replace('_poll', ''), port=port, aggregate=globalMetric
@@ -266,6 +275,7 @@ class DPDKTelemetryExporter():
                         components = metric['name'].replace('_idle_count','').split('_')
                         self.dpdkexporter_idle_count.labels(port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
+                                                            
                     if 'packets' in metric['name'] and 'size' not in metric['name']:
                         
                         # Get components with no packets
@@ -280,6 +290,47 @@ class DPDKTelemetryExporter():
                             components = metric['name'].replace('_packets','').replace('_priority{0}'.format(priority), '').split('_')
                             
                         
+                        self.dpdkexporter_packets.labels(port=port, aggregate=globalMetric, priority=priority, direction=components[0], type='_'.join(components[1:])
+                                                            )._value.set(float(metric['value']))
+                                                            
+                    if 'packets' in metric['name'] and 'size' in metric['name']:
+                        
+                        # Get components with no packets
+                        components = metric['name'].replace('_packets','').replace('_size','').split('_')
+                        
+                        # Get bucket as last in 'to'+1 or inf
+                        if components[-1] == 'max':
+                            bucket = float("inf")
+                        elif int(components[-1]) == 64 or int(components[-1]) == 1522 :
+                            bucket = int(components[-1])
+                        else:
+                            bucket = int(components[-1]) + 1
+                            
+                        _log.debug(bucket)
+                        
+                        # Find bucket index
+                        index = self.buckets.index(bucket)
+                        
+                        # Add to histogram
+                        self.dpdkexporter_packets_size.labels(port=port, aggregate=globalMetric, direction=components[0]
+                                                            )._sum.inc(float(metric['value']))
+                                                            
+                        self.dpdkexporter_packets_size.labels(port=port, aggregate=globalMetric, direction=components[0]
+                                                    )._buckets[index].set(float(metric['value']))
+                    
+                    if 'bytes' in metric['name']:
+                        components = metric['name'].replace('_bytes','').split('_')
+                        self.dpdkexporter_bytes.labels(port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
+                                                            )._value.set(float(metric['value']))
+                                                    
+                    if 'errors' in metric['name']:
+                        components = metric['name'].replace('_errors','').split('_')
+                        self.dpdkexporter_errors.labels(port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
+                                                            )._value.set(float(metric['value']))
+                                                            
+                    # Add malformed dpdk dropped packets for correlation
+                    if 'dropped' in metric['name'] and 'packets' not in metric['name']:
+                        components = metric['name'].split('_')
                         self.dpdkexporter_packets.labels(port=port, aggregate=globalMetric, priority=priority, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
 
