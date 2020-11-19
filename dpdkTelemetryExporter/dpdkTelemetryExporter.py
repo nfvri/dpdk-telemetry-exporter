@@ -177,19 +177,19 @@ class DPDKTelemetryExporter():
         # # Set metrics to expose
         
         # Gauges
-        self.dpdkexporter_busy_percent = Gauge('dpdk_telemetry_busy_percent', '', ['port', 'aggregate'])
-        self.dpdkexporter_idle_status = Gauge('dpdk_telemetry_idle_status', '', ['type', 'direction', 'port', 'aggregate'])
+        self.dpdkexporter_busy_percent = Gauge('dpdk_telemetry_busy_percent', '', ['socket', 'port', 'aggregate'])
+        self.dpdkexporter_idle_status = Gauge('dpdk_telemetry_idle_status', '', ['socket', 'type', 'direction', 'port', 'aggregate'])
         
         # Counter
-        self.dpdkexporter_polls = Counter('dpdk_telemetry_exporter_polls_total', '', ['type', 'port', 'aggregate'])
-        self.dpdkexporter_packets = Counter('dpdk_telemetry_packets_total', '', ['type', 'direction', 'priority', 'port', 'aggregate'])
-        self.dpdkexporter_bytes = Counter('dpdk_telemetry_bytes_total', '', ['type', 'direction', 'port', 'aggregate'], unit='bytes')
-        self.dpdkexporter_errors = Counter('dpdk_telemetry_errors_total', '', ['type', 'direction', 'port', 'aggregate'])
-        self.dpdkexporter_idle_count = Counter('dpdk_telemetry_idle_total', '', ['type', 'direction', 'port', 'aggregate'])
+        self.dpdkexporter_polls = Counter('dpdk_telemetry_exporter_polls_total', '', ['socket', 'type', 'port', 'aggregate'])
+        self.dpdkexporter_packets = Counter('dpdk_telemetry_packets_total', '', ['socket', 'type', 'direction', 'priority', 'port', 'aggregate'])
+        self.dpdkexporter_bytes = Counter('dpdk_telemetry_bytes_total', '', ['socket', 'type', 'direction', 'port', 'aggregate'], unit='bytes')
+        self.dpdkexporter_errors = Counter('dpdk_telemetry_errors_total', '', ['socket', 'type', 'direction', 'port', 'aggregate'])
+        self.dpdkexporter_idle_count = Counter('dpdk_telemetry_idle_total', '', ['socket', 'type', 'direction', 'port', 'aggregate'])
         
         # Histogram
         self.buckets = (64, 128, 256, 512, 1024, 1522, float("inf"))
-        self.dpdkexporter_packets_size = Histogram('dpdk_telemetry_packets_size', '', ['direction', 'port', 'aggregate'],
+        self.dpdkexporter_packets_size = Histogram('dpdk_telemetry_packets_size', '', ['socket', 'direction', 'port', 'aggregate'],
                                                    buckets=self.buckets)
         
         self.p = pp.ProcessPool(int(self.threads))
@@ -229,7 +229,7 @@ class DPDKTelemetryExporter():
         client.register()
         results = client.handle_socket()
         
-        return results
+        return { 'socket_path': socket_path, 'results': results }
     
     def getSingleV2SocketStats(self, socket_path):
         # Get status from requests     
@@ -245,7 +245,8 @@ class DPDKTelemetryExporter():
             yield l[i:i + n]
 
     def refreshMetricsV1(self, results):
-        for result in results:
+        socket_path = results['socket_path']
+        for result in results['results']:
             globalMetric = 0
             port = int(result['port'])
             # Telemetry V1 uses max C uint for global metrics, i.e.  4294967295
@@ -255,25 +256,25 @@ class DPDKTelemetryExporter():
             if 'stats' in result:
                 # Manually reset histogram
                 for direction in ['rx', 'tx']:
-                    self.dpdkexporter_packets_size.labels(port=port, aggregate=globalMetric, direction=direction
+                    self.dpdkexporter_packets_size.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=direction
                                                     )._sum.set(0)
                     for i, bucket in enumerate(self.buckets):
-                        self.dpdkexporter_packets_size.labels(port=port, aggregate=globalMetric, direction=direction
+                        self.dpdkexporter_packets_size.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=direction
                                                     )._buckets[i].set(0)
             
                 for metric in result['stats']:
                     if 'poll' in metric['name']:
-                        self.dpdkexporter_polls.labels(type=metric['name'].replace('_poll', ''), port=port, aggregate=globalMetric
+                        self.dpdkexporter_polls.labels(socket=socket_path, type=metric['name'].replace('_poll', ''), port=port, aggregate=globalMetric
                                                        )._value.set(float(metric['value']))
                     if 'busy_percent' in metric['name']:
-                        self.dpdkexporter_busy_percent.labels(port=port, aggregate=globalMetric).set(float(metric['value']))
+                        self.dpdkexporter_busy_percent.labels(socket=socket_path, port=port, aggregate=globalMetric).set(float(metric['value']))
                     if 'idle_status' in metric['name']:
                         components = metric['name'].replace('_idle_status','').split('_')
-                        self.dpdkexporter_idle_status.labels(port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
+                        self.dpdkexporter_idle_status.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
                                                              ).set(float(metric['value']))
                     if 'idle_count' in metric['name']:
                         components = metric['name'].replace('_idle_count','').split('_')
-                        self.dpdkexporter_idle_count.labels(port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
+                        self.dpdkexporter_idle_count.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
                                                             
                     if 'packets' in metric['name'] and 'size' not in metric['name']:
@@ -290,7 +291,7 @@ class DPDKTelemetryExporter():
                             components = metric['name'].replace('_packets','').replace('_priority{0}'.format(priority), '').split('_')
                             
                         
-                        self.dpdkexporter_packets.labels(port=port, aggregate=globalMetric, priority=priority, direction=components[0], type='_'.join(components[1:])
+                        self.dpdkexporter_packets.labels(socket=socket_path, port=port, aggregate=globalMetric, priority=priority, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
                                                             
                     if 'packets' in metric['name'] and 'size' in metric['name']:
@@ -312,26 +313,26 @@ class DPDKTelemetryExporter():
                         index = self.buckets.index(bucket)
                         
                         # Add to histogram
-                        self.dpdkexporter_packets_size.labels(port=port, aggregate=globalMetric, direction=components[0]
+                        self.dpdkexporter_packets_size.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=components[0]
                                                             )._sum.inc(float(metric['value']))
                                                             
-                        self.dpdkexporter_packets_size.labels(port=port, aggregate=globalMetric, direction=components[0]
+                        self.dpdkexporter_packets_size.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=components[0]
                                                     )._buckets[index].set(float(metric['value']))
                     
                     if 'bytes' in metric['name']:
                         components = metric['name'].replace('_bytes','').split('_')
-                        self.dpdkexporter_bytes.labels(port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
+                        self.dpdkexporter_bytes.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
                                                     
                     if 'errors' in metric['name']:
                         components = metric['name'].replace('_errors','').split('_')
-                        self.dpdkexporter_errors.labels(port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
+                        self.dpdkexporter_errors.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
                                                             
                     # Add malformed dpdk dropped packets for correlation
                     if 'dropped' in metric['name'] and 'packets' not in metric['name']:
                         components = metric['name'].split('_')
-                        self.dpdkexporter_packets.labels(port=port, aggregate=globalMetric, priority=priority, direction=components[0], type='_'.join(components[1:])
+                        self.dpdkexporter_packets.labels(socket=socket_path, port=port, aggregate=globalMetric, priority=priority, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
 
     def getDPDKStats(self):
@@ -355,13 +356,7 @@ class DPDKTelemetryExporter():
         
         for result in resultListV1:
             self.refreshMetricsV1(result)
-            
-#             self.bbexporter_request_latency_seconds.labels(tenant=result[0], campaign=result[1], endpoint=result[2],
-#                                                    type=result[3]).observe(result[4])
-#             self.bbexporter_request_latency_seconds.labels(tenant=result[5], campaign=result[6], endpoint=result[7], 
-#                                                    type=result[8]).observe(result[9])
-#             self.bbexporter_status_count.labels(tenant=result[10], campaign=result[11], endpoint=result[12], 
-#                                                    status=result[13]).inc()
+
         
     def run(self):
         # Start up the server to expose the metrics.
@@ -378,7 +373,7 @@ class DPDKTelemetryExporter():
 def parser():
     parser = argparse.ArgumentParser(prog='DPDKTelemetryExporter')
     parser.add_argument('-t', dest="threads", default='8', help='DPDKTelemetryExporter parallel threads (default: 8)')
-    parser.add_argument('-T', '--timeout', action='store', default=20, help='The update interval in seconds (default 20)')
+    parser.add_argument('-T', '--timeout', action='store', default=5, help='The update interval in seconds (default 5)')
     parser.add_argument(
         '-v',
         '--verbose',
