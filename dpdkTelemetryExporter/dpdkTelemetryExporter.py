@@ -7,7 +7,7 @@ import schedule
 import json
 import logging
 import argparse
-from prometheus_client import start_http_server, Summary, Counter, Gauge, Histogram
+from prometheus_client import start_http_server, Counter, Gauge, Histogram
 import pathos.pools as pp
 import socket
 import os
@@ -269,18 +269,18 @@ class DPDKTelemetryExporter():
                     if 'busy_percent' in metric['name']:
                         self.dpdkexporter_busy_percent.labels(socket=socket_path, port=port, aggregate=globalMetric).set(float(metric['value']))
                     if 'idle_status' in metric['name']:
-                        components = metric['name'].replace('_idle_status','').split('_')
+                        components = metric['name'].replace('_idle_status', '').split('_')
                         self.dpdkexporter_idle_status.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
                                                              ).set(float(metric['value']))
                     if 'idle_count' in metric['name']:
-                        components = metric['name'].replace('_idle_count','').split('_')
+                        components = metric['name'].replace('_idle_count', '').split('_')
                         self.dpdkexporter_idle_count.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
                                                             
                     if 'packets' in metric['name'] and 'size' not in metric['name']:
                         
                         # Get components with no packets
-                        components = metric['name'].replace('_packets','').split('_')
+                        components = metric['name'].replace('_packets', '').split('_')
                         
                         priority = ""
                         if 'priority' in metric['name']:
@@ -288,8 +288,7 @@ class DPDKTelemetryExporter():
                             priority = str(int(metric['name'].split('priority')[1].split('_')[0]))
                             
                             # Get components with no priority and packets
-                            components = metric['name'].replace('_packets','').replace('_priority{0}'.format(priority), '').split('_')
-                            
+                            components = metric['name'].replace('_packets', '').replace('_priority{0}'.format(priority), '').split('_')
                         
                         self.dpdkexporter_packets.labels(socket=socket_path, port=port, aggregate=globalMetric, priority=priority, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
@@ -297,7 +296,7 @@ class DPDKTelemetryExporter():
                     if 'packets' in metric['name'] and 'size' in metric['name']:
                         
                         # Get components with no packets
-                        components = metric['name'].replace('_packets','').replace('_size','').split('_')
+                        components = metric['name'].replace('_packets', '').replace('_size', '').split('_')
                         
                         # Get bucket as last in 'to'+1 or inf
                         if components[-1] == 'max':
@@ -320,20 +319,20 @@ class DPDKTelemetryExporter():
                                                     )._buckets[index].set(float(metric['value']))
                     
                     if 'bytes' in metric['name']:
-                        components = metric['name'].replace('_bytes','').split('_')
+                        components = metric['name'].replace('_bytes', '').split('_')
                         self.dpdkexporter_bytes.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
                                                     
                     if 'errors' in metric['name']:
-                        components = metric['name'].replace('_errors','').split('_')
+                        components = metric['name'].replace('_errors', '').split('_')
                         self.dpdkexporter_errors.labels(socket=socket_path, port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
                                                             )._value.set(float(metric['value']))
                                                             
                     # Add malformed dpdk dropped packets for correlation
                     if 'dropped' in metric['name'] and 'packets' not in metric['name']:
                         components = metric['name'].split('_')
-                        self.dpdkexporter_packets.labels(socket=socket_path, port=port, aggregate=globalMetric, priority=priority, direction=components[0], type='_'.join(components[1:])
-                                                            )._value.set(float(metric['value']))
+                        self.dpdkexporter_packets.labels(socket=socket_path, port=port, aggregate=globalMetric, priority=priority, direction=components[0],
+                                                         type='_'.join(components[1:]))._value.set(float(metric['value']))
 
     def getDPDKStats(self):
         
@@ -356,7 +355,6 @@ class DPDKTelemetryExporter():
         
         for result in resultListV1:
             self.refreshMetricsV1(result)
-
         
     def run(self):
         # Start up the server to expose the metrics.

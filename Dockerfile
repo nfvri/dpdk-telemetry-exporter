@@ -1,6 +1,6 @@
 FROM debian:stable
 
-MAINTAINER angelouev@intracom-telecom.com
+LABEL Author="Evangelos Angelou <angelouev@intracom-telecom.com>"
 LABEL Vendor="Intracom Telecom S.A."
 LABEL Description="DPDK Telemetry exporter image"
 
