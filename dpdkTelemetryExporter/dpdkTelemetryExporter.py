@@ -26,6 +26,7 @@ V1_API_UNREG = "{\"action\":2,\"command\":\"clients\",\"data\":{\"client_path\":
 V1_GLOBAL_METRICS_REQ = "{\"action\":0,\"command\":\"global_stat_values\",\"data\":null}"
 V1_DEFAULT_FP = "{0}/default_client".format(os.environ.get('DPDK_RUN_DIR', '/var/run/dpdk/'))
 
+
 class V1Socket:
 
     def __init__(self):
@@ -40,10 +41,11 @@ class V1Socket:
             self.client_fd.close()
         except:
             print("Error - Sockets could not be closed")
+
             
 class V1Client:
 
-    def __init__(self): # Creates a client instance
+    def __init__(self):  # Creates a client instance
         self.socket = V1Socket()
         self.socket_path = None
         self.unregistered = 0
@@ -58,7 +60,7 @@ class V1Client:
     def setSocketpath(self, socket_path):
         self.socket_path = socket_path
 
-    def register(self): # Connects a client to DPDK-instance
+    def register(self):  # Connects a client to DPDK-instance
         if os.path.exists(V1_DEFAULT_FP):
             os.unlink(V1_DEFAULT_FP)
         try:
@@ -73,17 +75,17 @@ class V1Client:
         self.socket.recv_fd.listen(1)
         self.socket.client_fd = self.socket.recv_fd.accept()[0]
 
-    def unregister(self): # Unregister a given client
+    def unregister(self):  # Unregister a given client
         self.socket.client_fd.send((V1_API_UNREG + V1_DEFAULT_FP + "\"}}").encode())
         self.socket.client_fd.close()
 
-    def requestMetrics(self): # Requests metrics for given client
+    def requestMetrics(self):  # Requests metrics for given client
         self.socket.client_fd.send(V1_METRICS_REQ.encode())
         data = self.socket.client_fd.recv(BUFFER_SIZE).decode()
         _log.debug("Response: {0}".format(data))
         return data
 
-    def requestGlobalMetrics(self): #Requests global metrics for given client
+    def requestGlobalMetrics(self):  # Requests global metrics for given client
         self.socket.client_fd.send(V1_GLOBAL_METRICS_REQ.encode())
         data = self.socket.client_fd.recv(BUFFER_SIZE).decode()
         _log.debug("Response: {0}".format(data))
@@ -91,24 +93,31 @@ class V1Client:
         
     def handle_socket(self):
         """ Connect to socket and handle user input """
+        
+        results = []
+        
         globalMetrics = json.loads(self.requestGlobalMetrics())
         
         if '200' in globalMetrics['status_code']:
             for port in globalMetrics['data']:
-                for metric in port['stats']:
-                    if metric['name'] == 'empty_poll':
-                        pass
-                        
-        
+                results.append(port)
+                    
         metrics = json.loads(self.requestMetrics())
+        
+        if '200' in metrics['status_code']:
+            for port in metrics['data']:
+                results.append(port)
+                
+        return results
+
             
 class V2Client:
 
-    def __init__(self): # Creates a client instance
+    def __init__(self):  # Creates a client instance
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
         self.socket_path = None
             
-    def setSocketpath(self, socket_path): # Gets arguments from Command-Line and assigns to instance of client
+    def setSocketpath(self, socket_path):  # Gets arguments from Command-Line and assigns to instance of client
         self.socket_path = socket_path
         
     def read_socket(self, sock, buf_len, echo=True):
@@ -147,6 +156,7 @@ class V2Client:
                 self.read_socket(self.socket, output_buf_len)
         self.socket.close()
 
+
 class DPDKTelemetryExporter():
     
     def __init__(self, args):
@@ -164,21 +174,21 @@ class DPDKTelemetryExporter():
         else:
             _log.setLevel(logging.CRITICAL)
             
-        ## Set metrics to expose
+        # # Set metrics to expose
         
         # Gauges
-        self.dpdkexporter_busy_percent = Gauge('dpdk_telemetry_busy_percent', '', ['port', 'global', 'status'])
-        self.dpdkexporter_idle_status = Gauge('dpdk_telemetry_idle_status', '', ['port', 'global', 'status'])
+        self.dpdkexporter_busy_percent = Gauge('dpdk_telemetry_busy_percent', '', ['port', 'aggregate'])
+        self.dpdkexporter_idle_status = Gauge('dpdk_telemetry_idle_status', '', ['type', 'direction', 'port', 'aggregate'])
         
         # Counter
-        self.dpdkexporter_polls = Counter('dpdk_telemetry_exporter_polls_total', '', ['type', 'port', 'global', 'status'])
-        self.dpdkexporter_packets = Counter('dpdk_telemetry_packets_total', '', ['type', 'direction', 'priority', 'port', 'global', 'status'])
-        self.dpdkexporter_bytes = Counter('dpdk_telemetry_bytes_total', '', ['type', 'direction', 'port', 'global', 'status'])
-        self.dpdkexporter_errors = Counter('dpdk_telemetry_errors_total', '', ['type', 'direction', 'port', 'global', 'status'])
-        self.dpdkexporter_idle_count = Counter('dpdk_telemetry_idle_total', '', ['port', 'global', 'status'])
+        self.dpdkexporter_polls = Counter('dpdk_telemetry_exporter_polls_total', '', ['type', 'port', 'aggregate'])
+        self.dpdkexporter_packets = Counter('dpdk_telemetry_packets_total', '', ['type', 'direction', 'priority', 'port', 'aggregate'])
+        self.dpdkexporter_bytes = Counter('dpdk_telemetry_bytes_total', '', ['type', 'direction', 'port', 'aggregate'])
+        self.dpdkexporter_errors = Counter('dpdk_telemetry_errors_total', '', ['type', 'direction', 'port', 'aggregate'])
+        self.dpdkexporter_idle_count = Counter('dpdk_telemetry_idle_total', '', ['type', 'direction', 'port', 'aggregate'])
         
         # Histogram
-        self.dpdkexporter_packets_size = Histogram('dpdk_telemetry_packets_size', '', ['direction', 'port', 'global', 'status'],
+        self.dpdkexporter_packets_size = Histogram('dpdk_telemetry_packets_size', '', ['direction', 'port', 'aggregate'],
                                                    buckets=(64, 128, 256, 512, 1024, 1522, float("inf")))
         
         self.p = pp.ProcessPool(int(self.threads))
@@ -210,16 +220,15 @@ class DPDKTelemetryExporter():
         _log.debug("v2sockets: {0}".format(v2sockets))
         
         return v2sockets
-        
     
     def getSingleV1SocketStats(self, socket_path):
         # Get status from requests     
         client = V1Client()
         client.setSocketpath(socket_path)
         client.register()
-        client.handle_socket()
+        results = client.handle_socket()
         
-        return []
+        return results
     
     def getSingleV2SocketStats(self, socket_path):
         # Get status from requests     
@@ -228,12 +237,51 @@ class DPDKTelemetryExporter():
         client.handle_socket()
         
         return []
-        
 
     def chunks(self, l, n):
         # Yield successive n-sized chunks from l.
         for i in range(0, len(l), n):
             yield l[i:i + n]
+
+    def refreshMetricsV1(self, results):
+        for result in results:
+            globalMetric = 0
+            port = int(result['port'])
+            # Telemetry V1 uses max C uint for global metrics, i.e.  4294967295
+            if port >= 4294967295: 
+                globalMetric = 1
+            
+            if 'stats' in result:
+                for metric in result['stats']:
+                    if 'poll' in metric['name']:
+                        self.dpdkexporter_polls.labels(type=metric['name'].replace('_poll', ''), port=port, aggregate=globalMetric
+                                                       )._value.set(float(metric['value']))
+                    if 'busy_percent' in metric['name']:
+                        self.dpdkexporter_busy_percent.labels(port=port, aggregate=globalMetric).set(float(metric['value']))
+                    if 'idle_status' in metric['name']:
+                        components = metric['name'].replace('_idle_status','').split('_')
+                        self.dpdkexporter_idle_status.labels(port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
+                                                             ).set(float(metric['value']))
+                    if 'idle_count' in metric['name']:
+                        components = metric['name'].replace('_idle_count','').split('_')
+                        self.dpdkexporter_idle_count.labels(port=port, aggregate=globalMetric, direction=components[0], type='_'.join(components[1:])
+                                                            )._value.set(float(metric['value']))
+                    if 'packets' in metric['name'] and 'size' not in metric['name']:
+                        
+                        # Get components with no packets
+                        components = metric['name'].replace('_packets','').split('_')
+                        
+                        priority = ""
+                        if 'priority' in metric['name']:
+                            # Get priority as str but ensure it is an int representation
+                            priority = str(int(metric['name'].split('priority')[1].split('_')[0]))
+                            
+                            # Get components with no priority and packets
+                            components = metric['name'].replace('_packets','').replace('_priority{0}'.format(priority), '').split('_')
+                            
+                        
+                        self.dpdkexporter_packets.labels(port=port, aggregate=globalMetric, priority=priority, direction=components[0], type='_'.join(components[1:])
+                                                            )._value.set(float(metric['value']))
 
     def getDPDKStats(self):
         
@@ -243,16 +291,20 @@ class DPDKTelemetryExporter():
         v2_socket_list = self.loadDPDKv2Sockets()
         _log.debug(v2_socket_list)
         
-        resultList = []
+        resultListV1 = []
+        resultListV2 = []
         
         # Run in parallel 
-        resultList.extend(self.p.map(self.getSingleV1SocketStats, v1_socket_list))
+        resultListV1.extend(self.p.map(self.getSingleV1SocketStats, v1_socket_list))
         
-        resultList.extend(self.p.map(self.getSingleV2SocketStats, v2_socket_list))
+        resultListV2.extend(self.p.map(self.getSingleV2SocketStats, v2_socket_list))
         
-        _log.debug(resultList)
+        _log.debug(resultListV1)
+        _log.debug(resultListV2)
         
-#         for result in resultList:
+        for result in resultListV1:
+            self.refreshMetricsV1(result)
+            
 #             self.bbexporter_request_latency_seconds.labels(tenant=result[0], campaign=result[1], endpoint=result[2],
 #                                                    type=result[3]).observe(result[4])
 #             self.bbexporter_request_latency_seconds.labels(tenant=result[5], campaign=result[6], endpoint=result[7], 
@@ -284,10 +336,12 @@ def parser():
         help='Set output verbosity (default: -vv = INFO)')
     return parser.parse_args()
 
+
 def main():
     args = parser()
     dte = DPDKTelemetryExporter(args)
     dte.run()
+
 
 if __name__ == '__main__':
     main()
