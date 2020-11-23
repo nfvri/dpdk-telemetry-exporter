@@ -126,11 +126,11 @@ class V2Client:
         try:
             ret = json.loads(reply)
         except json.JSONDecodeError:
-            print("Error in reply: ", reply)
+            _log.error("Error in reply: ", reply)
             sock.close()
             raise
-        if echo:
-            print(json.dumps(ret))
+        
+        _log.debug(json.dumps(ret))
         return ret
 
     def handle_socket(self):
@@ -149,12 +149,32 @@ class V2Client:
         self.socket.send("/".encode())
         CMDS = self.read_socket(self.socket, output_buf_len, False)["/"]
     
+        stats = []
+        
         # Send all commands to gather metrics
         for cmd in  CMDS:
-            if cmd.startswith('/'):
+            if cmd.startswith('/ethdev/list'):
                 self.socket.send(cmd.encode())
-                self.read_socket(self.socket, output_buf_len)
+                ports = self.read_socket(self.socket, output_buf_len)
+                _log.debug("ports: {0}".format(ports))
+                
+                for port in ports['/ethdev/list']:
+                    self.socket.send('/ethdev/xstats,{0}'.format(port).encode())
+                    xstats = self.read_socket(self.socket, output_buf_len)
+                    
+                    old_style_stats = [] 
+                    
+                    # Repackage in older format
+                    for name, value in xstats["/ethdev/xstats"].items():
+                        old_style_stats.append({'name': name, 'value': value})
+                    
+                    stats.append({"port": port, 'stats': old_style_stats } )
+            
         self.socket.close()
+        
+        _log.debug("Response: {0}".format(stats))
+        
+        return stats
 
 
 class DPDKTelemetryExporter():
@@ -182,7 +202,7 @@ class DPDKTelemetryExporter():
         self.dpdkexporter_idle_status = Gauge('dpdk_telemetry_idle_status', '', ['socket', 'type', 'direction', 'port', 'aggregate'])
         
         # Counter
-        self.dpdkexporter_polls = Counter('dpdk_telemetry_exporter_polls_total', '', ['socket', 'type', 'port', 'aggregate'])
+        self.dpdkexporter_polls = Counter('dpdk_telemetry_polls_total', '', ['socket', 'type', 'port', 'aggregate'])
         self.dpdkexporter_packets = Counter('dpdk_telemetry_packets_total', '', ['socket', 'type', 'direction', 'priority', 'port', 'aggregate'])
         self.dpdkexporter_bytes = Counter('dpdk_telemetry_bytes_total', '', ['socket', 'type', 'direction', 'port', 'aggregate'], unit='bytes')
         self.dpdkexporter_errors = Counter('dpdk_telemetry_errors_total', '', ['socket', 'type', 'direction', 'port', 'aggregate'])
@@ -236,16 +256,16 @@ class DPDKTelemetryExporter():
         # Get status from requests     
         client = V2Client()
         client.setSocketpath(socket_path)
-        client.handle_socket()
+        results = client.handle_socket()
         
-        return []
+        return { 'socket_path': socket_path, 'results': results }
 
     def chunks(self, l, n):
         # Yield successive n-sized chunks from l.
         for i in range(0, len(l), n):
             yield l[i:i + n]
 
-    def refreshMetricsV1(self, results):
+    def refreshMetrics(self, results):
         socket_path = results['socket_path']
         for result in results['results']:
             globalMetric = 0
@@ -355,7 +375,10 @@ class DPDKTelemetryExporter():
         _log.debug(resultListV2)
         
         for result in resultListV1:
-            self.refreshMetricsV1(result)
+            self.refreshMetrics(result)
+            
+        for result in resultListV2:
+            self.refreshMetrics(result)
         
     def run(self):
         # Start up the server to expose the metrics.
