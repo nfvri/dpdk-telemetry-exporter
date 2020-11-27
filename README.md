@@ -1,7 +1,7 @@
 # dpdk-telemetry-exporter
 A small DPDK telemetry exporter
 
-![dpdk-telemetry-exporter](/dte_grafana_screenshot.png?raw=true "Grafana screenshot of DPDK exported metrics exported to Prometheus")
+![dpdk-telemetry-exporter](/dte_grafana_screenshot.png?raw=true "Grafana screenshot of DPDK exported metrics from Prometheus")
 
 ## Run in docker
 
