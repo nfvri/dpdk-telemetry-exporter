@@ -1,7 +1,7 @@
 #NS = your docker namespace
 
 # For public repo
-export REPO = docker.pkg.github.com/nfvri/dpdk-telemetry-exporter
+export REPO = ghcr.io/nfvri
 
 export VERSION ?= 0.1
 
@@ -16,7 +16,7 @@ build-dpdk-telemetry-exporter:
 
 push-dpdk-telemetry-exporter:
 	# For public repo
-	echo $(REPO_PAT) | base64 -d | docker login docker.pkg.github.com -u $(USERNAME) --password-stdin
+	echo $(REPO_PAT) | base64 -d | docker login ghcr.io -u $(USERNAME) --password-stdin
 	docker push $(REPO)/$(NAME):$(VERSION)
 
 clean-dpdk-telemetry-exporter: 
