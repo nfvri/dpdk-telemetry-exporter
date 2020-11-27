@@ -1,6 +1,8 @@
 # dpdk-telemetry-exporter
 A small DPDK telemetry exporter
 
+![dpdk-telemetry-exporter](/dte_grafana_screenshot.png?raw=true "Grafana screenshot of DPDK exported metrics exported to Prometheus")
+
 ## Run in docker
 
 The recommended way when running locally. Remember to mount the dpdk run dir as a volume and add extra options to the command line, e.g.:
