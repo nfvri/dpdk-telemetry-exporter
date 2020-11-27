@@ -5,7 +5,7 @@ A small DPDK telemetry exporter
 
 The recommended way when running locally. Remember to mount the dpdk run dir as a volume and add extra options to the command line, e.g.:
 ```bash
-$ docker run --rm --name exporter -p 8000:8000 -v /var/run/dpdk/:/var/run/dpdk/ docker.pkg.github.com/nfvri/dpdk-telemetry-exporter/dpdk-telemetry-exporter:0.1 dpdkTelemetryExporter -vvv -T 5
+$ docker run --rm --name exporter -p 8000:8000 -v /var/run/dpdk/:/var/run/dpdk/ nfvri/dpdk-telemetry-exporter:0.1 dpdkTelemetryExporter -vvv -T 5
 ```
 
 ## Run as sidecar
@@ -21,7 +21,7 @@ spec:
       containers:
       - name: telemetry-exporter
         imagePullPolicy: Always
-        image: docker.pkg.github.com/nfvri/dpdk-telemetry-exporter/dpdk-telemetry-exporter:0.1
+        image: nfvri/dpdk-telemetry-exporter:0.1
         command: ["dpdkTelemetryExporter"]
         args: ["-vvv"]
         volumeMounts:
