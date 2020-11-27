@@ -143,7 +143,7 @@ Label name | Description
 -----------|-------------
 socket | The absolute socket path from which the metric was collected. Useful in the multi-threaded case to separate specific apps.
 port | The dpdk port number (as string). Note that for v1 telemetry global stats the uint max port number is used (4294967295).
-aggregate | Whether the metric is a global statistic (string "1") or not (string "0). This is provided to easily select aggregate stats when querying and the per-port stats are not required.
+aggregate | Whether the metric is a global statistic (string "1") or not (string "0). This is provided to easily select aggregate stats when querying and the per-port stats are not required (or vice versa).
 type | This has a specific meaning per metric. For example, in dpdk_telemetry_polls_total it has the poll type (empty or full), in dpdk_telemetry_errors_total the error type (e.g. missed). Generally, it collects the number of dimensions encountered in distinct dpdk stats for easy querying.
 direction | The flow direction (e.g. rx, tx) or mac where applicable.
 priority | This is specific to dpdk_telemetry_packets_total where the packet priority dimension is explicitly defined.
@@ -159,6 +159,5 @@ In the example above for Kubernetes pod sidecar run, the Prometheus target is se
 ```
 
 # Grafana dashboard
-A sample grafana dashboard is provided at `grafana_dashboard.json`. This is primarily meant for a Kubernetes Prometheus, so it assumes that there is a `pod` label available in the panel queries. Feel free to change it to the `instance` label if not running in Prometheus.
-
+A sample grafana dashboard is provided at `grafana_dashboard.json`. This is primarily meant for a Kubernetes Prometheus, so it assumes that there is a `pod` label available in the panel queries. Feel free to change it to the `instance` label if not running Prometheus in Kubernetes.
 
