@@ -110,13 +110,13 @@ optional arguments:
 
 ## Command-line arguments
 
-Short name | Long name | Arguments | Description
------------|-----------|-----------|-------------
--h | --help | None | Show usage and exit.
--t | --threads | Number of threads (int) | The number of parallel threads. This will impact the collection speed when there are many sockets from which the exporter has to gather metrics in parallel.
--p | --port | Port number (int) | The port number on which to expose metrics (default 8000).
--T | --timeout | Number of seconds (int) | The number of seconds between collections (i.e. the update interval). Default is 5 (seconds) but you can modify it to your needs.
--v | --verbose | None | Specify multiple times to set log level (default is -vv=INFO, use -vvv for DEBUG).
+Short | Long | Arguments | Description
+------|------|-----------|-------------
+-h | help | None | Show usage and exit.
+-t | threads | Number of threads (int) | The number of parallel threads. This will impact the collection speed when there are many sockets from which the exporter has to gather metrics in parallel.
+-p | port | Port number (int) | The port number on which to expose metrics (default 8000).
+-T | timeout | Number of seconds (int) | The number of seconds between collections (i.e. the update interval). Default is 5 (seconds) but you can modify it to your needs.
+-v | verbose | None | Specify multiple times to set log level (default is -vv=INFO, use -vvv for DEBUG).
 
 ## Environment variables
 
